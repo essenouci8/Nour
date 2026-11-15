@@ -105,7 +105,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
                       clipBehavior: Clip.none,
                       children: [
                         for (var i = 0; i < n; i++)
-                          _bubbleAt(p, i, pos, s, dir, side, cx(i)),
+                          _bubbleAt(p, i, pos, s, dir, side, cx(i.toDouble())),
                         Positioned(
                           left: cx(pos) - dropW / 2,
                           top: (_h - dropH) / 2,
