@@ -45,6 +45,7 @@ if "isCoreLibraryDesugaringEnabled" not in s and "coreLibraryDesugaringEnabled" 
 open(p,"w").write(s)
 PY
 
+rm -f test/widget_test.dart
 flutter pub get
 dart run flutter_launcher_icons
 echo "تم. شغّل:  flutter run"
