@@ -8,9 +8,9 @@ import 'package:flutter/services.dart';
 import 'theme.dart';
 import 'widgets.dart' show NavItem;
 
-/// شريط التنقل: فقاعات زجاجية منفصلة، وقطرة عدسية سائلة تنتقل بينها.
+/// شريط التنقل: فقاعات زجاجية منفصلة، وقطرة سائلة تنتقل بينها.
 /// عند القفز لزرّ بعيد تتمدّد القطرة وتدفع الفقاعات التي في طريقها ثم تستقر بنبضة.
-/// الانكسار الحقيقي بـ fragment shader (Impeller)، وبديله تمويه عادي.
+/// القطرة شفافة (تمويه لما خلفها) وأيقونتها وعنوانها يُرسمان فوقها دائمًا.
 class GlassNav extends StatefulWidget {
   final int index;
   final ValueChanged<int> onTap;
@@ -25,34 +25,12 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
   static const double _h = 76;
   static const double _bubble = 52;
 
-  // ضبط المظهر: عدّل هذه القيم بعد التجربة على الهاتف.
-  static const double _refractStrength = 1.0;
-  static const double _edgeWidth = 20; // سُمك منطقة الانكسار
-  static const double _aberration = 0.7;
-
   late final AnimationController _c;
-  ui.FragmentShader? _shader;
-  final _navKey = GlobalKey();
-
-  // وضع معايرة الشيدر: اضغط مطولًا على الشريط للتبديل بين 0..4
-  // 0 محلي منطقي | 1 محلي فيزيائي | 2 عام فيزيائي | 3 محلي فيزيائي مقلوب | 4 عام مقلوب
-  int _mode = 1;
 
   @override
   void initState() {
     super.initState();
     _c = AnimationController.unbounded(vsync: this, value: widget.index.toDouble());
-    _loadShader();
-  }
-
-  Future<void> _loadShader() async {
-    try {
-      if (!ui.ImageFilter.isShaderFilterSupported) return;
-      final prog = await ui.FragmentProgram.fromAsset('shaders/lens.frag');
-      if (mounted) setState(() => _shader = prog.fragmentShader());
-    } catch (_) {
-      // يبقى البديل (تمويه)
-    }
   }
 
   @override
@@ -70,7 +48,6 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
 
   @override
   void dispose() {
-    _shader?.dispose();
     _c.dispose();
     super.dispose();
   }
@@ -81,16 +58,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final n = widget.items.length;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onLongPress: () {
-        setState(() => _mode = (_mode + 1) % 5);
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(SnackBar(duration: const Duration(seconds: 2), content: Text('shader mode $_mode')));
-      },
-      child: SizedBox(
-      key: _navKey,
+    return SizedBox(
       height: _h,
       child: LayoutBuilder(builder: (context, box) {
         final w = box.maxWidth;
@@ -118,14 +86,13 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
                     return Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        for (var i = 0; i < n; i++)
-                          _bubbleAt(p, i, pos, s, dir, side, cx(i.toDouble())),
+                        for (var i = 0; i < n; i++) _bubbleAt(p, i, pos, s, dir, side, cx(i.toDouble())),
                         Positioned(
                           left: cx(pos) - dropW / 2,
                           top: (_h - dropH) / 2,
                           width: dropW,
                           height: dropH,
-                          child: _drop(p, dropW, dropH, s, nearest, cx(pos) - dropW / 2, (_h - dropH) / 2),
+                          child: _drop(p, dropW, dropH, s, nearest),
                         ),
                       ],
                     );
@@ -156,7 +123,6 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
           ],
         );
       }),
-    ),
     );
   }
 
@@ -167,7 +133,6 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
     final dx = dir * side * push * 10;
     final dy = push * 8;
     final scale = 1 - 0.18 * push;
-    final iconColor = Color.lerp(p.muted, p.accent, close)!;
 
     final fill = p.dark ? Colors.white.withOpacity(0.07) : Colors.white.withOpacity(0.42);
     return Positioned(
@@ -193,7 +158,11 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
                 child: Container(
                   decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
                   alignment: Alignment.center,
-                  child: Icon(widget.items[i].icon, size: 22, color: iconColor),
+                  // الأيقونة تخفت عندما تقترب القطرة لأنها ترسم الأيقونة النشطة بنفسها
+                  child: Opacity(
+                    opacity: (1 - close).clamp(0.0, 1.0).toDouble(),
+                    child: Icon(widget.items[i].icon, size: 22, color: p.muted),
+                  ),
                 ),
               ),
             ),
@@ -203,43 +172,12 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _drop(NourPalette p, double w, double h, double s, int nearest, double left, double top) {
-    ui.ImageFilter filter;
-    final sh = _shader;
-    if (sh != null) {
-      final mq = MediaQuery.of(context);
-      final dpr = mq.devicePixelRatio;
-      final global = _mode == 2 || _mode == 4;
-      final phys = _mode != 0;
-      final k = phys ? dpr : 1.0;
-      var ox = 0.0, oy = 0.0;
-      var tw = w * k, th = h * k;
-      if (global) {
-        final rb = _navKey.currentContext?.findRenderObject() as RenderBox?;
-        final o = (rb != null && rb.attached) ? rb.localToGlobal(Offset.zero) : Offset.zero;
-        ox = (o.dx + left) * dpr;
-        oy = (o.dy + top) * dpr;
-        tw = mq.size.width * dpr;
-        th = mq.size.height * dpr;
-      }
-      sh
-        ..setFloat(0, w * k)
-        ..setFloat(1, h * k)
-        ..setFloat(2, ox)
-        ..setFloat(3, oy)
-        ..setFloat(4, tw)
-        ..setFloat(5, th)
-        ..setFloat(6, (_mode == 3 || _mode == 4) ? 1.0 : 0.0)
-        ..setFloat(7, _refractStrength * (0.85 + 0.35 * s))
-        ..setFloat(8, _edgeWidth)
-        ..setFloat(9, _aberration)
-        ..setFloat(10, k);
-      filter = ui.ImageFilter.shader(sh);
-    } else {
-      filter = ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10);
-    }
+  Widget _drop(NourPalette p, double w, double h, double s, int nearest) {
+    // شفافة: تمويه خفيف لما خلفها مع تلوين أبيض رقيق
+    final tintTop = p.dark ? Colors.white.withOpacity(0.16) : Colors.white.withOpacity(0.55);
+    final tintBottom = p.dark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.18);
+    final labelOpacity = (1 - s * 1.6).clamp(0.0, 1.0).toDouble();
 
-    final tint = p.dark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.10);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(h / 2),
@@ -251,21 +189,37 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
       child: ClipRRect(
         borderRadius: BorderRadius.circular(h / 2),
         child: BackdropFilter(
-          filter: filter,
+          filter: ui.ImageFilter.blur(sigmaX: 9, sigmaY: 9),
           child: CustomPaint(
             foregroundPainter: _RimPainter(dark: p.dark, strength: 1.0),
             child: Container(
-              color: tint,
-              alignment: Alignment.bottomCenter,
-              padding: const EdgeInsets.only(bottom: 5),
-              child: Opacity(
-                opacity: (1 - s * 1.6).clamp(0.0, 1.0).toDouble(),
-                child: Text(
-                  widget.items[nearest].label,
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: p.accent, height: 1.1),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [tintTop, tintBottom],
                 ),
+              ),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.items[nearest].icon, size: 23, color: p.accent),
+                  SizedBox(height: 3 * labelOpacity),
+                  SizedBox(
+                    height: 12 * labelOpacity,
+                    child: Opacity(
+                      opacity: labelOpacity,
+                      child: Text(
+                        widget.items[nearest].label,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: p.accent, height: 1.1),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
