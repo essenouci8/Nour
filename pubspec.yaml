@@ -1,0 +1,38 @@
+name: nour
+description: نور — مواقيت الصلاة والقرآن والأذكار
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  adhan: ^2.0.0+1
+  geolocator: ^13.0.1
+  flutter_compass: ^0.8.1
+  shared_preferences: ^2.3.2
+  google_fonts: ^6.2.1
+  http: ^1.2.2
+  just_audio: ^0.9.40
+  flutter_local_notifications: ^17.2.4
+  timezone: ^0.9.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon/icon.png
+  adaptive_icon_background: '#0E5A47'
+  adaptive_icon_foreground: assets/icon/foreground.png
+
+flutter:
+  uses-material-design: true
