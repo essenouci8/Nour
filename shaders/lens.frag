@@ -2,11 +2,16 @@
 #include <flutter/runtime_effect.glsl>
 
 // عدسة سائلة: انكسار عند الحواف + انحراف لوني خفيف + تمويه طفيف.
-// المُدخل الأول (uTex) هو ما خلف الفقاعة، يضبطه Flutter تلقائيًا.
-uniform vec2 uSize;       // حجم الفقاعة
-uniform float uStrength;  // قوة الانكسار
-uniform float uEdge;      // سُمك منطقة الانكسار عند الحافة (بكسل)
-uniform float uAberr;     // الانحراف اللوني
+// uTex هو ما خلف الفقاعة. أنظمة الإحداثيات تختلف بين الأجهزة، لذلك
+// أُرسل الأصل وحجم الخامة وقلب المحور من Dart (انظر أوضاع المعايرة).
+uniform vec2 uSize;     // حجم العدسة
+uniform vec2 uOrigin;   // موضع العدسة في فضاء FlutterFragCoord
+uniform vec2 uTexSize;  // حجم الخامة في نفس الفضاء
+uniform float uFlip;    // 1 = قلب المحور الرأسي
+uniform float uStrength;
+uniform float uEdge;
+uniform float uAberr;
+uniform float uPx;      // معامل تحويل بكسلات الإعدادات
 uniform sampler2D uTex;
 
 out vec4 fragColor;
@@ -18,21 +23,27 @@ float sdPill(vec2 p, vec2 hs) {
 }
 
 vec3 samp(vec2 f) {
-  vec3 c = vec3(0.0);
-  c += texture(uTex, clamp((f + vec2(-1.5, -1.5)) / uSize, 0.0, 1.0)).rgb;
-  c += texture(uTex, clamp((f + vec2( 1.5, -1.5)) / uSize, 0.0, 1.0)).rgb;
-  c += texture(uTex, clamp((f + vec2(-1.5,  1.5)) / uSize, 0.0, 1.0)).rgb;
-  c += texture(uTex, clamp((f + vec2( 1.5,  1.5)) / uSize, 0.0, 1.0)).rgb;
+  vec2 uv = f / uTexSize;
+  if (uFlip > 0.5) uv.y = 1.0 - uv.y;
+  return texture(uTex, clamp(uv, 0.0, 1.0)).rgb;
+}
+
+vec3 sampFrost(vec2 f) {
+  float o = 1.5 * uPx;
+  vec3 c = samp(f + vec2(-o, -o)) + samp(f + vec2(o, -o)) +
+           samp(f + vec2(-o, o)) + samp(f + vec2(o, o));
   return c * 0.25;
 }
 
 void main() {
   vec2 frag = FlutterFragCoord().xy;
+  vec2 lp = frag - uOrigin;           // إحداثي محلي داخل العدسة
   vec2 hs = uSize * 0.5;
-  vec2 p = frag - hs;
+  vec2 p = lp - hs;
 
+  float edge = uEdge * uPx;
   float depth = -sdPill(p, hs);
-  float t = clamp(1.0 - depth / uEdge, 0.0, 1.0);
+  float t = clamp(1.0 - depth / edge, 0.0, 1.0);
   float bend = t * t * (3.0 - 2.0 * t) * uStrength;
 
   vec2 e = vec2(1.0, 0.0);
@@ -41,12 +52,12 @@ void main() {
     sdPill(p + e.yx, hs) - sdPill(p - e.yx, hs));
   vec2 n = g / max(length(g), 1e-4);
 
-  vec2 base = frag - p * 0.07 * uStrength;   // تكبير خفيف للمركز
-  vec2 off = -n * bend * uEdge * 0.9;
+  vec2 base = frag - p * 0.07 * uStrength;
+  vec2 off = -n * bend * edge * 0.9;
 
   vec3 col;
-  col.r = samp(base + off * (1.0 - uAberr * 0.12)).r;
-  col.g = samp(base + off).g;
-  col.b = samp(base + off * (1.0 + uAberr * 0.12)).b;
+  col.r = sampFrost(base + off * (1.0 - uAberr * 0.12)).r;
+  col.g = sampFrost(base + off).g;
+  col.b = sampFrost(base + off * (1.0 + uAberr * 0.12)).b;
   fragColor = vec4(col, 1.0);
 }

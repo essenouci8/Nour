@@ -32,6 +32,11 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
 
   late final AnimationController _c;
   ui.FragmentShader? _shader;
+  final _navKey = GlobalKey();
+
+  // وضع معايرة الشيدر: اضغط مطولًا على الشريط للتبديل بين 0..4
+  // 0 محلي منطقي | 1 محلي فيزيائي | 2 عام فيزيائي | 3 محلي فيزيائي مقلوب | 4 عام مقلوب
+  int _mode = 1;
 
   @override
   void initState() {
@@ -76,7 +81,16 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final n = widget.items.length;
 
-    return SizedBox(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onLongPress: () {
+        setState(() => _mode = (_mode + 1) % 5);
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(duration: const Duration(seconds: 2), content: Text('shader mode $_mode')));
+      },
+      child: SizedBox(
+      key: _navKey,
       height: _h,
       child: LayoutBuilder(builder: (context, box) {
         final w = box.maxWidth;
@@ -111,7 +125,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
                           top: (_h - dropH) / 2,
                           width: dropW,
                           height: dropH,
-                          child: _drop(p, dropW, dropH, s, nearest),
+                          child: _drop(p, dropW, dropH, s, nearest, cx(pos) - dropW / 2, (_h - dropH) / 2),
                         ),
                       ],
                     );
@@ -142,6 +156,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
           ],
         );
       }),
+    ),
     );
   }
 
@@ -188,16 +203,37 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _drop(NourPalette p, double w, double h, double s, int nearest) {
+  Widget _drop(NourPalette p, double w, double h, double s, int nearest, double left, double top) {
     ui.ImageFilter filter;
     final sh = _shader;
     if (sh != null) {
+      final mq = MediaQuery.of(context);
+      final dpr = mq.devicePixelRatio;
+      final global = _mode == 2 || _mode == 4;
+      final phys = _mode != 0;
+      final k = phys ? dpr : 1.0;
+      var ox = 0.0, oy = 0.0;
+      var tw = w * k, th = h * k;
+      if (global) {
+        final rb = _navKey.currentContext?.findRenderObject() as RenderBox?;
+        final o = (rb != null && rb.attached) ? rb.localToGlobal(Offset.zero) : Offset.zero;
+        ox = (o.dx + left) * dpr;
+        oy = (o.dy + top) * dpr;
+        tw = mq.size.width * dpr;
+        th = mq.size.height * dpr;
+      }
       sh
-        ..setFloat(0, w)
-        ..setFloat(1, h)
-        ..setFloat(2, _refractStrength * (0.85 + 0.35 * s))
-        ..setFloat(3, _edgeWidth)
-        ..setFloat(4, _aberration);
+        ..setFloat(0, w * k)
+        ..setFloat(1, h * k)
+        ..setFloat(2, ox)
+        ..setFloat(3, oy)
+        ..setFloat(4, tw)
+        ..setFloat(5, th)
+        ..setFloat(6, (_mode == 3 || _mode == 4) ? 1.0 : 0.0)
+        ..setFloat(7, _refractStrength * (0.85 + 0.35 * s))
+        ..setFloat(8, _edgeWidth)
+        ..setFloat(9, _aberration)
+        ..setFloat(10, k);
       filter = ui.ImageFilter.shader(sh);
     } else {
       filter = ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10);
