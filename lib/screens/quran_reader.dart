@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../core/common.dart';
 import '../services/quran_api.dart';
+import 'share_card.dart';
 
 class QuranReader extends StatefulWidget {
   final int surah;
@@ -336,6 +337,27 @@ class _QuranReaderState extends State<QuranReader> {
                         ),
                       ),
                     ],
+                  ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final nav = Navigator.of(ctx);
+                      final text = '${a.text} ﴿${_arNum(a.inSurah)}﴾';
+                      var name = '${t('surah')} ${nd(widget.surah)}';
+                      try {
+                        final list = await QuranApi.surahs();
+                        name = list.firstWhere((e) => e.number == widget.surah).name;
+                      } catch (_) {}
+                      nav.pop();
+                      if (!mounted) return;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ShareCardScreen(text: text, source: '$name · ${t('ayah')} ${nd(a.inSurah)}'),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.ios_share, size: 18, color: p.accent),
+                    label: Text(t('share_card'), style: NourText.body(14, p.accent, w: FontWeight.w600)),
                   ),
                 ],
               ),

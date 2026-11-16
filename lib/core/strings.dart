@@ -191,6 +191,14 @@ const _s = <String, List<String>>{
   'version': ['الإصدار', 'Version', 'Version'],
   'developed_by': ['تم تطويره بواسطة هشام السنوسي', 'Developed by Hicham Essenouci', 'Développé par Hicham Essenouci'],
 
+  // بطاقة المشاركة
+  'share': ['مشاركة', 'Share', 'Partager'],
+  'share_card': ['مشاركة كصورة', 'Share as image', 'Partager en image'],
+  'share_failed': ['تعذّرت المشاركة', 'Could not share', 'Partage impossible'],
+  'style_paper': ['ورقي', 'Paper', 'Papier'],
+  'style_green': ['زمردي', 'Emerald', 'Émeraude'],
+  'style_night': ['ليلي', 'Night', 'Nuit'],
+
   // التنبيهات (نصوص الإشعارات)
   'prayer_now': ['حان الآن موعد صلاة {p}', 'It is time for {p}', 'C’est l’heure de {p}'],
   'prayer_soon': ['بعد {m} دقائق تقام صلاة {p}', '{p} in {m} minutes', '{p} dans {m} minutes'],

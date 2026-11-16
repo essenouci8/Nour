@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../core/common.dart';
 import '../data/adhkar.dart';
+import 'share_card.dart';
 
 /// تبويب الأذكار: المسبحة، الأذكار اليومية، الأدعية.
 class AdhkarScreen extends StatefulWidget {
@@ -311,6 +312,20 @@ class _DhikrScreenState extends State<DhikrScreen> {
                                       ? t('done')
                                       : '${t('remaining')} ${nd(_left[i])} ${t('of')} ${nd(items[i].count)}',
                                   style: NourText.body(13, done ? p.accent : p.muted),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  tooltip: t('share_card'),
+                                  visualDensity: VisualDensity.compact,
+                                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                                  icon: Icon(Icons.ios_share, size: 20, color: p.muted),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ShareCardScreen(
+                                          text: items[i].text, source: t('g_${widget.group.id}')),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
